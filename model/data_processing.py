@@ -77,18 +77,8 @@ def processdf(session_id):
     df.ffill(inplace=True) # just incase a window has no samples
     return df
 
-# %% visualize setup
-import matplotlib.pyplot as plt
-def plot_scatter_distances(df):
-    plt.plot(df.index, df['dist_left'], 'r')
-    plt.plot(df.index, df['dist_right'], 'b')
-    return plt
-
-# %% visualize processed data
-df = processdf(2)
-plot_scatter_distances(df).show()
-
-# %% visualize velocity - smoothed rolling mean displacement
-df_smooth = df.rolling('250ms').mean()
-df_smooth = df_smooth.diff()
-plot_scatter_distances(df_smooth)
+# %% pickle the data
+df_1 = processdf(1)
+df_1.to_pickle(data_dir + 'exercise_1')
+df_2 = processdf(2)
+df_2.to_pickle(data_dir + 'exercise_2')
