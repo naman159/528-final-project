@@ -1,6 +1,10 @@
 import pandas as pd
-import json
+import matplotlib.pyplot as plt
+import datetime
 import numpy as np
+from scipy.signal import find_peaks
+from collections import deque
+import json
 import os
 
 data_dir = "data/session-1/"
@@ -42,9 +46,9 @@ def processdf(session_id):
     # find files matching L + session_id & R + session_id
     l_df, r_df = None, None
     for file in os.listdir(data_dir):
-        if file == 'L.txt':
+        if file.startswith('L' + str(session_id)):
             l_df = processFile(file)
-        elif file == 'R.txt':
+        elif file.startswith('R' + str(session_id)):
             r_df = processFile(file)
     assert(l_df is not None and r_df is not None)
 
@@ -76,8 +80,95 @@ def processdf(session_id):
     df = pd.merge(l_df, r_df, how='left', left_index=True, right_index=True)
     df.ffill(inplace=True) # just incase a window has no samples
     return df
+
+def get_set_reps_df(df):
+    df['dist'] = df[['dist_left', 'dist_right']].mean(axis=1)
+
+    # velocity
+    df_veloc = df.diff().rolling('100ms').median()
+    df_veloc = df_veloc.rename({'dist_left': 'velocity_left', 'dist_right':'velocity_right'}, axis=1)
+    df['velocity'] = df_veloc[['velocity_left', 'velocity_right']].mean(axis=1)
+
+    # velocity correlation
+    df['corr'] = df_veloc['velocity_left'].rolling('4000ms').corr(df_veloc['velocity_right'])#.rolling('400ms').mean()
+
+    df = df.replace([np.inf, -np.inf], np.nan) # boo infinity corr
+    df = df.dropna()
+
+    df['corr^3_x_speed'] = df['corr'].pow(3) * df['velocity'].abs()
+
+    # if any any window_size we exceed the function theshold, the window contains set data
+    threshold = 10
+    df_start_ts, df_end_ts = df.index[0], df.index[-1]
+    window_size = datetime.timedelta(seconds=4)
+    curr_ts = df_start_ts - window_size/2
+    in_set = False
+    n_sets = 0
+    df['set_num'] = np.nan
+
+    while curr_ts <= df_end_ts:
+        window_df = df.loc[curr_ts:curr_ts+window_size]
+        curr_function_value = window_df['corr^3_x_speed'].max()
+        if(curr_function_value < threshold):
+            if in_set:
+                in_set = False
+            df.drop(index=window_df.index, inplace=True)
+        else:
+            if not in_set:
+                n_sets += 1
+                in_set = True
+            df.loc[curr_ts:curr_ts+window_size, 'set_num'] = n_sets
+        curr_ts += window_size
+
+
+    # for each set identify the peaks/valleys and therfore reps
+    df['rep_num'] = np.nan
+    df['rep_state'] = np.nan
+    for curr_set_num in df['set_num'].unique():
+        set_df = df[df['set_num'] == curr_set_num]
+        data = set_df['dist']
+        peaks, _ = find_peaks(data, distance=10, height=np.quantile(data, 0.75)) # distance 10 because it would take at least 1/2 second to a repitation (sample freq is 50ms * 10 distance = 500ms)
+        inv_data = data * -1
+        valleys, _ = find_peaks(inv_data, distance=10, height=np.quantile(inv_data, 0.75))
+
+
+        curr_ts = set_df.index[0]
+        n_reps = 0
+        in_rep = False
+
+        if len(valleys)==0 or len(peaks)==0: break
+
+        # only proces peaks/valleys that have an alternate state before them
+        events = [] # rep start & peak indexes so even list length
+        peaks_q, valleys_q = deque(peaks), deque(valleys)
+        while(len(peaks_q) and len(valleys_q)):
+            p_idx, v_idx = peaks_q[0], valleys_q[0]
+            if(p_idx < v_idx):
+                p_idx = peaks_q.popleft() # start of rep, or junk
+                if not len(peaks_q):
+                    pass
+                elif not peaks_q[0] < v_idx:
+                    v_idx = valleys_q.popleft()
+                    events += [p_idx, v_idx]
+            else:
+                v_idx = valleys_q.popleft() # start of rep or junk
+                if not len(valleys_q):
+                    pass
+                elif not valleys_q[0] < p_idx:
+                    p_idx = peaks_q.popleft()
+                    events += [v_idx, p_idx]
+
+        events_ts = set_df.iloc[events].index
+
+        events_ts = events_ts.append(set_df.index[-1:]) # add the end of the set to the events timestamps
+
+        rep_num = 0
+        df.drop(index=set_df[set_df.index[0]:events_ts[0]].index, inplace=True) # drop beginning of set that's not a rep
+        for i in range(0, len(events_ts)-1, 2):
+            rep_num += 1
+            df.loc[events_ts[i]:events_ts[i+2], 'rep_num'] = rep_num
+            df.loc[events_ts[i]:events_ts[i+1], 'rep_state'] = 0
+            df.loc[events_ts[i+1]:events_ts[i+2], 'rep_state'] = 1
+    return df
 # %% pickle the data
-df_1 = processdf(1)
-df_1.to_pickle(data_dir + 'exercise_5')
-# df_2 = processdf(2)
-# df_2.to_pickle(data_dir + 'exercise_2')
+get_set_reps_df(processdf(2))
