@@ -1,16 +1,20 @@
+from copyreg import pickle
+from io import StringIO
+import io
+import streamlit as st
 import pandas as pd
-import json
 import numpy as np
+import pandas as pd
 import os
+import json
 
-data_dir = "data/session-1/"
-r_file="R2 2022-04-14 21_45_31.txt"
-l_file="L2 2022-04-14 21_45_49.txt"
-def processFile(filename):
-    path = data_dir + filename
-    log_data=open(path,'r')
 
-    # parse the log file into a pandas df
+#---------------------------------------------------------------------------------------------------------#
+# Data Processing on Upload
+data_dir = "data/txt/"
+
+def processFile(log_data):
+
     headers = ["level", "timestamp", "message"]
     def log_to_json(_log_data, _headers):
         result={}
@@ -19,7 +23,6 @@ def processFile(filename):
             columns = line.split('\t') #or w/e you're delimiter/separator is
             data = {}
             for idx, c in enumerate(columns):
-                # print(i, _headers[min(idx, len(_headers)- 1)], c)
                 key = _headers[idx]
                 value = c
                 data[key] = value
@@ -38,15 +41,8 @@ def processFile(filename):
     df = df.set_index('timestamp')
     return df
 
-def processdf(session_id):
-    # find files matching L + session_id & R + session_id
-    l_df, r_df = None, None
-    for file in os.listdir(data_dir):
-        if file.startswith('L' + str(session_id)):
-            l_df = processFile(file)
-        elif file.startswith('R' + str(session_id)):
-            r_df = processFile(file)
-    assert(l_df is not None and r_df is not None)
+def processdf(files):
+    l_df, r_df = processFile(files[0]), processFile(files[1])
 
     # find earliest common slow-time scan & lastest common scan & then drop rows not common on time
     earliest_common_scan = max(l_df.index[0], r_df.index[0])
@@ -77,8 +73,48 @@ def processdf(session_id):
     df.ffill(inplace=True) # just incase a window has no samples
     return df
 
-# %% pickle the data
-df_1 = processdf(1)
-df_1.to_pickle(data_dir + 'exercise_1')
-df_2 = processdf(2)
-df_2.to_pickle(data_dir + 'exercise_2')
+def get_pickle(id, files):
+    df = processdf(files)
+    df.to_pickle("data/pickle/" + 'exercise'+id)
+    print(df)
+#---------------------------------------------------------------------------------------------------------#
+
+# App
+if 'options' not in st.session_state:
+    st.session_state['options'] = os.listdir("data/pickle/")
+
+hide_footer_style = """
+                        <style>
+                        .reportview-container .main footer {visibility: hidden;}
+                        </style>    
+                    """
+
+st.title('Exercise')
+
+with st.sidebar:
+    dropdown = st.empty()
+    if 'choice' not in st.session_state:
+        st.session_state['choice'] = dropdown.selectbox('Choose the exercise/day', st.session_state['options'], 0)
+        
+    st.session_state['df'] = pd.read_pickle("data/pickle/" + st.session_state['choice'])
+
+    # Upload files
+    uploaded_files = st.file_uploader("Upload L & R text files", accept_multiple_files=True)
+
+    # 2 files
+    if uploaded_files:
+        def convert_to_wrapper(file):
+            reader = io.BufferedReader(file)
+            return io.TextIOWrapper(reader)
+
+        uploaded_files = list(map(convert_to_wrapper, uploaded_files))
+        get_pickle('8', uploaded_files) # Todo: Unique id creation/date
+
+
+        st.session_state['options'] = os.listdir("data/pickle/")
+        st.session_state['choice'] = dropdown.selectbox('Choose the exercise/day', st.session_state['options'])
+        st.session_state['df'] = pd.read_pickle("data/pickle/" + st.session_state['choice'])
+
+
+st.line_chart(st.session_state['df'])
+
