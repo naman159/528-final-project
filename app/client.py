@@ -85,18 +85,17 @@ def get_pickle(id, files):
 if 'options' not in st.session_state:
     st.session_state['options'] = os.listdir("data/pickle/")
 
-hide_footer_style = """
-                        <style>
-                        .reportview-container .main footer {visibility: hidden;}
-                        </style>
-                    """
 
 st.title('Exercise')
 
+bc = st.empty()
+lc = st.empty()
+
+
+
 with st.sidebar:
     dropdown = st.empty()
-    if 'choice' not in st.session_state:
-        st.session_state['choice'] = dropdown.selectbox('Choose the exercise/day', st.session_state['options'], 0)
+    st.session_state['choice'] = dropdown.selectbox('Choose the exercise/day', st.session_state['options'], 0)
 
     st.session_state['df'] = pd.read_pickle("data/pickle/" + st.session_state['choice'])
 
@@ -117,6 +116,5 @@ with st.sidebar:
         st.session_state['choice'] = dropdown.selectbox('Choose the exercise/day', st.session_state['options'])
         st.session_state['df'] = pd.read_pickle("data/pickle/" + st.session_state['choice'])
 
-
-st.bar_chart(st.session_state['df'].groupby('set_num')['rep_num'].max())
-st.line_chart(st.session_state['df'][['dist']])
+bc.bar_chart(st.session_state['df'].groupby('set_num')['rep_num'].max())
+lc.line_chart(st.session_state['df']['dist'])
