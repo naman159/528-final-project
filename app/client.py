@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import os
 import json
-
+import data_processing
 
 #---------------------------------------------------------------------------------------------------------#
 # Data Processing on Upload
@@ -71,12 +71,14 @@ def processdf(files):
 
     df = pd.merge(l_df, r_df, how='left', left_index=True, right_index=True)
     df.ffill(inplace=True) # just incase a window has no samples
+
+    df = data_processing.get_set_reps_df(df)
     return df
 
 def get_pickle(id, files):
     df = processdf(files)
     df.to_pickle("data/pickle/" + 'exercise'+id)
-    print(df)
+    #print(df)
 #---------------------------------------------------------------------------------------------------------#
 
 # App
@@ -86,7 +88,7 @@ if 'options' not in st.session_state:
 hide_footer_style = """
                         <style>
                         .reportview-container .main footer {visibility: hidden;}
-                        </style>    
+                        </style>
                     """
 
 st.title('Exercise')
@@ -95,7 +97,7 @@ with st.sidebar:
     dropdown = st.empty()
     if 'choice' not in st.session_state:
         st.session_state['choice'] = dropdown.selectbox('Choose the exercise/day', st.session_state['options'], 0)
-        
+
     st.session_state['df'] = pd.read_pickle("data/pickle/" + st.session_state['choice'])
 
     # Upload files
@@ -116,5 +118,5 @@ with st.sidebar:
         st.session_state['df'] = pd.read_pickle("data/pickle/" + st.session_state['choice'])
 
 
-st.line_chart(st.session_state['df'])
-
+st.bar_chart(st.session_state['df'].groupby('set_num')['rep_num'].max())
+st.line_chart(st.session_state['df'][['dist']])
