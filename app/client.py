@@ -1,4 +1,5 @@
 from copyreg import pickle
+from distutils.command.build_ext import extension_name_re
 from io import StringIO
 import io
 import streamlit as st
@@ -77,7 +78,7 @@ def processdf(files):
 
 def get_pickle(id, files):
     df = processdf(files)
-    df.to_pickle("data/pickle/" + 'exercise'+id)
+    df.to_pickle("data/pickle/" + 'exercise-'+id)
     #print(df)
 #---------------------------------------------------------------------------------------------------------#
 
@@ -91,13 +92,14 @@ st.title('Exercise')
 bc = st.empty()
 lc = st.empty()
 
-
-
 with st.sidebar:
     dropdown = st.empty()
-    st.session_state['choice'] = dropdown.selectbox('Choose the exercise/day', st.session_state['options'], 0)
-
+    st.session_state['choice'] = dropdown.selectbox('Choose the exercise/day', st.session_state['options'])
+        
     st.session_state['df'] = pd.read_pickle("data/pickle/" + st.session_state['choice'])
+
+    # Enter name
+    ex_name = st.text_input('Exercise Name', '')
 
     # Upload files
     uploaded_files = st.file_uploader("Upload L & R text files", accept_multiple_files=True)
@@ -109,12 +111,17 @@ with st.sidebar:
             return io.TextIOWrapper(reader)
 
         uploaded_files = list(map(convert_to_wrapper, uploaded_files))
-        get_pickle('8', uploaded_files) # Todo: Unique id creation/date
+        get_pickle(ex_name, uploaded_files) # Todo: Unique id creation/date
 
 
         st.session_state['options'] = os.listdir("data/pickle/")
-        st.session_state['choice'] = dropdown.selectbox('Choose the exercise/day', st.session_state['options'])
-        st.session_state['df'] = pd.read_pickle("data/pickle/" + st.session_state['choice'])
+        # dropdown.selectbox('Choose the exercise/day', st.session_state['options'])
+        # st.session_state['choice'] = None
+        # st.session_state['choice'] = dropdown.selectbox('Choose the exercise/day', st.session_state['options'])
+        # st.session_state['df'] = pd.read_pickle("data/pickle/" + st.session_state['choice'])
 
 bc.bar_chart(st.session_state['df'].groupby('set_num')['rep_num'].max())
 lc.line_chart(st.session_state['df']['dist'])
+
+
+# Issue: Multiple uploads won't make new files.
