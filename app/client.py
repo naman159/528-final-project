@@ -2,6 +2,7 @@ from copyreg import pickle
 from distutils.command.build_ext import extension_name_re
 from io import StringIO
 import io
+from random import randint
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -83,9 +84,7 @@ def get_pickle(id, files):
 #---------------------------------------------------------------------------------------------------------#
 
 # App
-options = os.listdir("data/pickle/")
-
-
+choices = os.listdir("data/pickle/")
 st.title('Exercise')
 
 bc = st.empty()
@@ -93,7 +92,7 @@ lc = st.empty()
 
 with st.sidebar:
     dropdown = st.empty()
-    st.session_state['choice'] = dropdown.selectbox('Choose the exercise id', options)
+    st.session_state['choice'] = dropdown.selectbox('Choose the exercise id', choices)
         
     st.session_state['df'] = pd.read_pickle("data/pickle/" + st.session_state['choice'])
 
@@ -101,7 +100,7 @@ with st.sidebar:
     ex_name = st.text_input('Exercise Name', '')
 
     # Upload files
-    uploaded_files = st.file_uploader("Upload L & R text files", accept_multiple_files=True)
+    uploaded_files = st.file_uploader("Upload L & R text files", accept_multiple_files=True)[-2:]
 
     # 2 files
     if uploaded_files:
@@ -111,6 +110,7 @@ with st.sidebar:
 
         uploaded_files = list(map(convert_to_wrapper, uploaded_files))
         get_pickle(ex_name, uploaded_files)
+
 
 bc.bar_chart(st.session_state['df'].groupby('set_num')['rep_num'].max())
 lc.line_chart(st.session_state['df']['dist'])
