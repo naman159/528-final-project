@@ -83,8 +83,7 @@ def get_pickle(id, files):
 #---------------------------------------------------------------------------------------------------------#
 
 # App
-if 'options' not in st.session_state:
-    st.session_state['options'] = os.listdir("data/pickle/")
+options = os.listdir("data/pickle/")
 
 
 st.title('Exercise')
@@ -94,7 +93,7 @@ lc = st.empty()
 
 with st.sidebar:
     dropdown = st.empty()
-    st.session_state['choice'] = dropdown.selectbox('Choose the exercise/day', st.session_state['options'])
+    st.session_state['choice'] = dropdown.selectbox('Choose the exercise id', options)
         
     st.session_state['df'] = pd.read_pickle("data/pickle/" + st.session_state['choice'])
 
@@ -111,14 +110,7 @@ with st.sidebar:
             return io.TextIOWrapper(reader)
 
         uploaded_files = list(map(convert_to_wrapper, uploaded_files))
-        get_pickle(ex_name, uploaded_files) # Todo: Unique id creation/date
-
-
-        st.session_state['options'] = os.listdir("data/pickle/")
-        # dropdown.selectbox('Choose the exercise/day', st.session_state['options'])
-        # st.session_state['choice'] = None
-        # st.session_state['choice'] = dropdown.selectbox('Choose the exercise/day', st.session_state['options'])
-        # st.session_state['df'] = pd.read_pickle("data/pickle/" + st.session_state['choice'])
+        get_pickle(ex_name, uploaded_files)
 
 bc.bar_chart(st.session_state['df'].groupby('set_num')['rep_num'].max())
 lc.line_chart(st.session_state['df']['dist'])
